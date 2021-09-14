@@ -2,13 +2,12 @@ package br.com.demo.coroutine_transactional.tx
 
 import org.springframework.core.KotlinDetector
 import org.springframework.lang.Nullable
-import org.springframework.transaction.PlatformTransactionManager
+import org.springframework.orm.jpa.JpaTransactionManager
 import org.springframework.transaction.TransactionManager
 import org.springframework.transaction.interceptor.DefaultTransactionAttribute
 import org.springframework.transaction.interceptor.TransactionAttribute
 import org.springframework.transaction.interceptor.TransactionAttributeSource
 import org.springframework.transaction.interceptor.TransactionInterceptor
-import org.springframework.transaction.support.CallbackPreferringPlatformTransactionManager
 import org.springframework.util.ClassUtils
 import java.lang.reflect.Method
 import kotlin.coroutines.Continuation
@@ -35,25 +34,25 @@ class CoroutineJpaTransactionInterceptor(
     }
 
     override fun invokeWithinTransaction(method: Method, targetClass: Class<*>?, invocation: InvocationCallback): Any? {
+
         if (!KotlinDetector.isSuspendingFunction(method)) {
             return super.invokeWithinTransaction(method, targetClass, invocation)
         }
 
         val txAttr = transactionAttributeSource?.getTransactionAttribute(method, targetClass)
-        val ptm = determineTransactionManager(txAttr) as PlatformTransactionManager
+        val ptm = determineTransactionManager(txAttr) as JpaTransactionManager
         val joinpointIdentification = methodIdentification(method, targetClass, txAttr)
+        val txInfo = createTransactionIfNecessary(ptm, txAttr, joinpointIdentification)
 
-        return if (txAttr == null || ptm !is CallbackPreferringPlatformTransactionManager) {
-            val txInfo = createTransactionIfNecessary(ptm, txAttr, joinpointIdentification)
-            (invocation as CoroutinesInvocationCallback).installTransactionContinuation(txInfo)
-            invocation.proceedWithInvocation()
-        } else {
-            super.invokeWithinTransaction(method, targetClass, invocation)
+        return (invocation as CoroutinesInvocationCallback).installTransactionContinuation(txInfo).run {
+            proceedWithInvocation()
         }
     }
 
     @Suppress("UNCHECKED_CAST")
-    private fun CoroutinesInvocationCallback.installTransactionContinuation(txInfo: TransactionInfo) {
+    private fun CoroutinesInvocationCallback.installTransactionContinuation(
+        txInfo: TransactionInfo
+    ): CoroutinesInvocationCallback {
         val transactionContinuation =
             TransactionContinuation(continuation as Continuation<Any?>) { result ->
                 result.onFailure { throwable ->
@@ -66,6 +65,8 @@ class CoroutineJpaTransactionInterceptor(
             }
 
         arguments.apply { this[size - 1] = transactionContinuation }
+
+        return this
     }
 
     private fun methodIdentification(
