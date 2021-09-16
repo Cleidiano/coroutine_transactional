@@ -12,19 +12,18 @@ import kotlin.coroutines.coroutineContext
 class CoroutineTransactionalOperator : TransactionalOperator {
 
     override suspend fun <T> execute(block: suspend CoroutineScope.() -> T): T {
-        val context =
-            coroutineContext[TransactionElement]?.apply { referenceCount.incrementAndGet() }
-                ?: run { coroutineContext + TransactionElement(DB.createTransaction()) }
-
+        val currentContext = coroutineContext[TransactionElement]?.also { it.referenceCount.incrementAndGet() }
+        val transactionContext = currentContext ?: (coroutineContext + TransactionElement(DB.createTransaction()))
+        val txScope = transactionContext[TransactionElement]!!
         val result = try {
-            withContext(context, block).also { context[TransactionElement]!!.transaction.commitAndContinue() }
+            withContext(transactionContext, block).also { txScope.transaction.commitAndContinue() }
         } catch (e: Exception) {
-            context[TransactionElement]!!.transaction.end()
+            txScope.transaction.end()
             throw e
         }
 
-        if (context[TransactionElement]!!.referenceCount.decrementAndGet() == 0) {
-            context[TransactionElement]!!.transaction.commit()
+        if (txScope.referenceCount.decrementAndGet() == 0) {
+            txScope.transaction.commit()
         }
 
         return result
