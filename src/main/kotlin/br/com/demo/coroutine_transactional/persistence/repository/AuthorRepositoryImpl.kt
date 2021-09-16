@@ -1,20 +1,15 @@
 package br.com.demo.coroutine_transactional.persistence.repository
 
-import br.com.demo.coroutine_transactional.persistence.AuthorEntity
 import br.com.demo.coroutine_transactional.domain.book.model.Author
 import br.com.demo.coroutine_transactional.domain.book.repository.AuthorRepository
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import org.springframework.data.jpa.repository.JpaRepository
+import br.com.demo.coroutine_transactional.tx.inTransaction
 import org.springframework.stereotype.Component
 
 @Component
-class AuthorRepositoryImpl(val jpaAuthorRepository: JPAAuthorRepository) : AuthorRepository {
+class AuthorRepositoryImpl : AuthorRepository {
 
-    override suspend fun getOrCreate(author: Author): Author = withContext(Dispatchers.IO) {
-        jpaAuthorRepository.save(author.toEntity()).toModel()
+    override suspend fun getOrCreate(author: Author): Author {
+        author.toEntity().inTransaction { transaction -> save(transaction) }
+        return author
     }
 }
-
-@Component
-interface JPAAuthorRepository : JpaRepository<AuthorEntity, String>

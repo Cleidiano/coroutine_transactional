@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
-    <include resource="org/springframework/boot/logging/logback/base.xml" />
+    <include resource="org/springframework/boot/logging/logback/base.xml"/>
     <logger name="org.springframework" level="INFO"/>
+
+    <logger name="io.ebean.SQL" level="DEBUG"/>
+    <logger name="io.ebean.cache.QUERY" level="INFO"/>
+    <logger name="io.ebean.DDL" level="INFO"/>
+
 </configuration>

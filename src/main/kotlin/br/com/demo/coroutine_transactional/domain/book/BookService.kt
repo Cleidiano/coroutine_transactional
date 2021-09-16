@@ -5,20 +5,19 @@ import br.com.demo.coroutine_transactional.domain.book.model.Book
 import br.com.demo.coroutine_transactional.domain.book.model.BookDefinition
 import br.com.demo.coroutine_transactional.domain.book.repository.AuthorRepository
 import br.com.demo.coroutine_transactional.domain.book.repository.BookRepository
-import br.com.demo.coroutine_transactional.tx.withTransactionContext
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.async
 import org.springframework.stereotype.Service
-import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDate
 
 @Service
 class BookService(
     private val bookRepository: BookRepository,
     private val authorRepository: AuthorRepository,
+    private val transactionalOperator: TransactionalOperator
 ) {
 
-    @Transactional
-    suspend fun publish(bookDefinition: BookDefinition, shouldThrows: Boolean): Book = withTransactionContext {
+    suspend fun publish(bookDefinition: BookDefinition, shouldThrows: Boolean): Book = transactionalOperator.execute {
         val author = async {
             authorRepository.getOrCreate(
                 author = Author(
@@ -28,20 +27,25 @@ class BookService(
             )
         }
 
-        val book = async {
-            bookRepository.save(
-                Book(
-                    id = bookDefinition.id,
-                    isbn = bookDefinition.isbn,
-                    author = author.await(),
-                    title = bookDefinition.title,
-                    published = LocalDate.now()
+        transactionalOperator.execute {
+            val book = async {
+                bookRepository.save(
+                    Book(
+                        id = bookDefinition.id,
+                        isbn = bookDefinition.isbn,
+                        author = author.await(),
+                        title = bookDefinition.title,
+                        published = LocalDate.now()
+                    )
                 )
-            )
-        }
-
-        book.await().also {
-            if (shouldThrows) throw RuntimeException("Just to rollback")
+            }
+            book.await().also {
+                if (shouldThrows) throw RuntimeException("Just to rollback")
+            }
         }
     }
+}
+
+interface TransactionalOperator {
+    suspend fun <T> execute(block: suspend CoroutineScope.() -> T): T
 }

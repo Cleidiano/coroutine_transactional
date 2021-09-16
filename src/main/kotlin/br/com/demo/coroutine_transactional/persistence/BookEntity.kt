@@ -1,6 +1,7 @@
 package br.com.demo.coroutine_transactional.persistence
 
 import br.com.demo.coroutine_transactional.domain.book.model.Book
+import io.ebean.Model
 import java.time.LocalDate
 import javax.persistence.CascadeType
 import javax.persistence.Entity
@@ -12,21 +13,22 @@ import javax.persistence.Table
 
 @Entity
 @Table(name = "books")
-data class BookEntity(
+class BookEntity : Model() {
 
     @Id
-    val id: String,
+    lateinit var id: String
 
-    var isbn: String,
+    lateinit var isbn: String
 
-    var title: String,
+    lateinit var title: String
 
-    var published: LocalDate,
+    lateinit var published: LocalDate
 
     @ManyToOne(fetch = FetchType.EAGER, cascade = [CascadeType.ALL])
     @JoinColumn(name = "author_id")
-    var author: AuthorEntity,
-) {
+    lateinit var author: AuthorEntity
+
+
     fun toModel(): Book {
         return Book(
             id = this.id,
@@ -36,4 +38,6 @@ data class BookEntity(
             title = this.title
         )
     }
+
+
 }

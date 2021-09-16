@@ -1,6 +1,7 @@
 package br.com.demo.coroutine_transactional.persistence
 
 import br.com.demo.coroutine_transactional.domain.book.model.Author
+import io.ebean.Model
 import javax.persistence.CascadeType
 import javax.persistence.Entity
 import javax.persistence.Id
@@ -10,7 +11,7 @@ import javax.persistence.Table
 
 @Entity
 @Table(name = "authors")
-class AuthorEntity {
+class AuthorEntity : Model() {
     @Id
     var id: String? = null
 
